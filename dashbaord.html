@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>F.L.O.W. — Clean Multi-Panel Control</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0b0f17;
+      --surface: rgba(18, 24, 38, 0.88);
+      --surface-elevated: rgba(26, 35, 54, 0.96);
+      --border: rgba(229, 184, 105, 0.24);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --text: #f3f5f8;
+      --muted: #9aa5b8;
+      --gold: #e5b869;
+      --gold-bright: #f6cf88;
+      --gold-soft: rgba(229, 184, 105, 0.14);
+      --emerald: #34d399;
+      --amber: #fbbf24;
+      --rose: #f87171;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-base);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .ico {
+      width: 16px; height: 16px; stroke: currentColor; fill: none;
+      stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0;
+    }
+    .ico-lg { width: 26px; height: 26px; }
+
+    @media (hover: hover) and (pointer: fine) {
+      body, a, button, input, select { cursor: none; }
+      .cursor-dot, .cursor-ring {
+        position: fixed; top: 0; left: 0; pointer-events: none; z-index: 100000;
+        border-radius: 50%; transform: translate(-50%, -50%);
+        transition: width 0.2s ease, height 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+      }
+      .cursor-dot { width: 7px; height: 7px; background: var(--gold-bright); box-shadow: 0 0 10px rgba(229, 184, 105, 0.8); }
+      .cursor-ring { width: 30px; height: 30px; border: 1.5px solid rgba(229, 184, 105, 0.55); background: rgba(229, 184, 105, 0.04); }
+      body.cursor-hover .cursor-ring { width: 44px; height: 44px; border-color: var(--gold-bright); background: rgba(229, 184, 105, 0.12); }
+      body.cursor-down .cursor-dot { transform: translate(-50%, -50%) scale(0.7); }
+    }
+    @media (hover: none), (pointer: coarse) { .cursor-dot, .cursor-ring { display: none; } }
+
+    #bgCanvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+
+    /* 6-Second 0-100% Loader */
+    #preloader {
+      position: fixed; inset: 0; z-index: 9999;
+      background: radial-gradient(circle at center, #121927 0%, #070a10 100%);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; padding: 24px; transition: opacity 0.6s ease, visibility 0.6s ease, transform 0.6s ease;
+    }
+    #preloader.done { opacity: 0; visibility: hidden; transform: scale(1.03); }
+    .loader-logo-wrap {
+      width: 72px; height: 72px; border-radius: 18px; padding: 4px;
+      background: linear-gradient(135deg, rgba(229, 184, 105, 0.5), rgba(255, 255, 255, 0.06));
+      animation: floatLogo 2.2s ease-in-out infinite;
+    }
+    .loader-logo-wrap img { width: 100%; height: 100%; object-fit: cover; border-radius: 14px; display: block; }
+    @keyframes floatLogo { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+    .loader-brand { font-size: 0.82rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); font-weight: 600; }
+    .loader-percent { font-family: 'JetBrains Mono', monospace; font-size: clamp(2.3rem, 8vw, 3.2rem); font-weight: 600; line-height: 1; }
+    .loader-track { width: min(360px, 86vw); height: 5px; background: rgba(255, 255, 255, 0.08); border-radius: 999px; overflow: hidden; }
+    .loader-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #b8893b, var(--gold-bright)); border-radius: 999px; transition: width 0.08s linear; }
+    .loader-step { font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; color: var(--muted); text-align: center; max-width: 400px; }
+
+    /* Main Layout */
+    .app {
+      position: relative; z-index: 1; max-width: 1180px; margin: 0 auto;
+      padding: 20px 16px 36px; display: flex; flex-direction: column; gap: 16px;
+      opacity: 0; transform: translateY(12px); transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+    .app.revealed { opacity: 1; transform: translateY(0); }
+
+    .card {
+      background: var(--surface); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--border-subtle); border-radius: 16px; padding: 18px 20px;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+    .card-vip { border-color: var(--border); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32); }
+
+    header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px; }
+    .brand-left { display: flex; align-items: center; gap: 12px; }
+    .brand-logo { width: 46px; height: 46px; border-radius: 12px; object-fit: cover; border: 1px solid var(--border); background: var(--surface-elevated); }
+    .title-group h1 { font-size: clamp(1.1rem, 3vw, 1.28rem); font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .vip-badge { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600; color: var(--gold); background: var(--gold-soft); border: 1px solid var(--border); padding: 2px 8px; border-radius: 6px; }
+    .title-group p { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+
+    .header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .pill, .icon-btn {
+      display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px; border-radius: 999px;
+      background: var(--surface-elevated); border: 1px solid var(--border-subtle);
+      font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; font-weight: 500; color: var(--text);
+    }
+    .icon-btn:hover, .icon-btn.active { border-color: var(--gold); color: var(--gold); background: var(--gold-soft); }
+    .notif-badge { background: var(--gold); color: #0b0f17; font-weight: 700; font-size: 0.68rem; padding: 1px 6px; border-radius: 999px; }
+
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rose); }
+    .dot.ok { background: var(--emerald); box-shadow: 0 0 8px rgba(52, 211, 153, 0.5); }
+    .dot.pump { background: var(--gold); box-shadow: 0 0 10px rgba(229, 184, 105, 0.75); animation: pulseDot 1.3s infinite; }
+    @keyframes pulseDot { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }
+
+    .env-strip { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 18px; }
+    .env-left, .env-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; }
+    .env-place { display: inline-flex; align-items: center; gap: 6px; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.86rem; }
+    .env-weather { color: var(--gold-bright); background: var(--gold-soft); border: 1px solid var(--border); padding: 4px 10px; border-radius: 8px; }
+    .diag-tag { padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border-subtle); background: rgba(8, 12, 20, 0.75); }
+    .diag-tag strong { color: var(--gold); }
+    .phase-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-weight: 600; border: 1px solid var(--border-subtle); background: var(--surface-elevated); }
+    .phase-badge.day { color: #fde68a; border-color: rgba(251, 191, 36, 0.35); background: rgba(251, 191, 36, 0.12); }
+    .phase-badge.night { color: #bae6fd; border-color: rgba(56, 189, 248, 0.35); background: rgba(56, 189, 248, 0.12); }
+
+    /* Offline Gate */
+    .offline-overlay { display: none; border-color: rgba(248, 113, 113, 0.45); background: linear-gradient(145deg, rgba(38, 15, 22, 0.92), rgba(16, 20, 32, 0.95)); padding: 20px; }
+    .offline-overlay.active { display: flex; flex-direction: column; gap: 12px; }
+    .offline-top { display: flex; align-items: flex-start; gap: 12px; }
+    .offline-icon-box { width: 42px; height: 42px; border-radius: 10px; background: rgba(248, 113, 113, 0.14); border: 1px solid rgba(248, 113, 113, 0.35); color: var(--rose); display: grid; place-items: center; flex-shrink: 0; }
+    .offline-title { font-size: 1rem; font-weight: 700; color: #fecaca; margin-bottom: 3px; }
+    .offline-msg { font-size: 0.85rem; line-height: 1.45; }
+    .offline-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+    .offline-codes { font-family: 'JetBrains Mono', monospace; font-size: 0.74rem; color: var(--muted); }
+    .btn-retry { display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: 10px; border: 1px solid var(--gold); background: var(--gold); color: #0b0f17; font-weight: 700; font-size: 0.82rem; }
+    .dashboard-body.locked { opacity: 0.42; pointer-events: none; user-select: none; filter: grayscale(0.25); }
+
+    /* Mode Selector Row */
+    .modes-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .mode-btn { background: var(--surface); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 14px 16px; color: var(--text); text-align: left; transition: border-color 0.2s ease, transform 0.2s ease; }
+    .mode-btn:hover { border-color: rgba(229, 184, 105, 0.38); transform: translateY(-2px); }
+    .mode-btn.active { background: linear-gradient(145deg, rgba(229, 184, 105, 0.16), rgba(18, 24, 38, 0.95)); border-color: var(--gold); }
+    .mode-top { display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 0.94rem; margin-bottom: 4px; }
+    .mode-pill { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; padding: 2px 8px; border-radius: 5px; background: rgba(255, 255, 255, 0.06); color: var(--muted); }
+    .mode-btn.active .mode-pill { background: var(--gold-soft); color: var(--gold); }
+    .mode-desc { font-size: 0.78rem; color: var(--muted); }
+
+    /* Dedicated Separate Panels (Only One Active at a Time) */
+    .clean-panel { display: none; }
+    .clean-panel.open { display: block; animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--border-subtle); flex-wrap: wrap; }
+    .panel-title { font-size: 0.98rem; font-weight: 700; color: var(--gold); }
+    .panel-sub { font-size: 0.8rem; color: var(--muted); }
+
+    .btn-close-panel { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border-subtle); background: var(--surface-elevated); color: var(--text); font-size: 0.78rem; font-weight: 600; }
+    .btn-close-panel:hover { border-color: var(--gold); color: var(--gold); }
+
+    .master-top-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .calendar-btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--gold-soft); color: var(--gold); font-weight: 600; font-size: 0.82rem; }
+    .calendar-btn:hover { background: var(--gold); color: #0b0f17; }
+
+    .pump-btn { width: 100%; padding: 14px; border-radius: 12px; border: none; font-weight: 600; font-size: 0.92rem; }
+    .pump-btn.off { background: linear-gradient(135deg, #d5a552, var(--gold-bright)); color: #0b0f17; }
+    .pump-btn.on { background: linear-gradient(135deg, #ef4444, var(--rose)); color: #fff; }
+
+    .schedule-box { display: none; margin-top: 14px; padding: 14px; border-radius: 12px; background: rgba(8, 12, 20, 0.82); border: 1px solid var(--border); }
+    .schedule-box.open { display: block; }
+    .sched-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .sched-field { display: flex; flex-direction: column; gap: 6px; font-size: 0.76rem; color: var(--muted); }
+    .sched-field input, .sched-field select { padding: 9px 10px; border-radius: 8px; border: 1px solid var(--border-subtle); background: var(--surface-elevated); color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
+    .sched-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+
+    .info-3col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .info-box { background: rgba(8, 12, 20, 0.68); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 12px 14px; }
+    .info-lbl { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--muted); margin-bottom: 4px; }
+    .info-val { font-weight: 600; font-size: 0.9rem; }
+
+    .btn-gold { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 9px; border: 1px solid var(--border); background: var(--gold-soft); color: var(--gold); font-size: 0.8rem; font-weight: 600; }
+    .btn-gold:hover { background: var(--gold); color: #0b0f17; }
+
+    .log-box { margin-top: 12px; background: rgba(8, 12, 20, 0.88); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 12px 14px; font-family: 'JetBrains Mono', monospace; display: flex; flex-direction: column; gap: 8px; }
+    .log-meta { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 0.74rem; color: var(--muted); }
+
+    .notif-list { display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto; }
+    .notif-item { background: rgba(8, 12, 20, 0.75); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .notif-time { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--muted); }
+
+    .subtabs { display: flex; gap: 8px; }
+    .subtab { padding: 7px 13px; border-radius: 8px; border: 1px solid var(--border-subtle); background: var(--surface-elevated); color: var(--text); font-size: 0.78rem; font-weight: 600; }
+    .subtab.active { border-color: var(--gold); background: var(--gold-soft); color: var(--gold); }
+    .subpane { display: none; }
+    .subpane.active { display: block; }
+
+    .perf-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
+    .bar-chart { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; align-items: end; height: 120px; padding: 12px; border-radius: 12px; background: rgba(8, 12, 20, 0.78); border: 1px solid var(--border-subtle); }
+    .chart-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 6px; }
+    .chart-bar-wrap { width: 100%; flex: 1; display: flex; align-items: flex-end; justify-content: center; }
+    .chart-bar { width: 65%; min-height: 6px; border-radius: 5px 5px 2px 2px; background: linear-gradient(180deg, var(--gold-bright), #b8893b); transition: height 0.35s ease; }
+    .chart-day { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--muted); }
+
+    /* Zones with Gauges Beside A, B, C */
+    .zones-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .zone-card.selected { border-color: var(--gold); }
+    .zone-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .zone-title { font-weight: 600; font-size: 0.98rem; }
+    .zone-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; padding: 3px 9px; border-radius: 6px; background: rgba(255, 255, 255, 0.05); color: var(--muted); }
+    .zone-card.selected .zone-tag { background: var(--gold-soft); color: var(--gold); }
+    .zone-reading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    .zone-val { font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 600; }
+    .gauge-svg { width: 62px; height: 40px; flex-shrink: 0; }
+    .gauge-track { fill: none; stroke: rgba(255, 255, 255, 0.1); stroke-width: 6; stroke-linecap: round; }
+    .gauge-arc { fill: none; stroke: var(--gold); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 82; stroke-dashoffset: 82; transition: stroke-dashoffset 0.35s ease; }
+
+    .bar-bg { height: 7px; background: rgba(255, 255, 255, 0.07); border-radius: 999px; overflow: hidden; margin-bottom: 14px; }
+    .bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--amber), var(--gold), var(--emerald)); border-radius: 999px; transition: width 0.35s ease; }
+
+    .btn-secondary { width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-subtle); background: var(--surface-elevated); color: var(--text); font-weight: 600; font-size: 0.82rem; }
+    .btn-secondary:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+    .btn-secondary:disabled { opacity: 0.42; cursor: not-allowed; }
+
+    .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .metric-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 6px; }
+    .metric-number { font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; font-weight: 600; }
+
+    footer { text-align: center; padding: 6px 12px 4px; font-size: 0.8rem; color: var(--muted); }
+    .creator-link { color: var(--gold); text-decoration: none; font-weight: 600; }
+
+    @media (max-width: 900px) {
+      .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+      .info-3col, .sched-grid, .perf-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 680px) {
+      .modes-grid, .zones-grid { grid-template-columns: 1fr; }
+      .zone-val { font-size: 1.8rem; }
+      .metric-number { font-size: 1.3rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="cursor-dot" id="cursorDot"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+  <canvas id="bgCanvas"></canvas>
+
+  <!-- 6-Second 0-100% Loader -->
+  <div id="preloader">
+    <div class="loader-logo-wrap">
+      <img src="dahy.png" alt="F.L.O.W. Logo" onerror="this.style.display='none'">
+    </div>
+    <div class="loader-brand">Project F.L.O.W.</div>
+    <div class="loader-percent" id="loaderPercent">0%</div>
+    <div class="loader-track"><div class="loader-bar" id="loaderBar"></div></div>
+    <div class="loader-step" id="loaderStep">Requesting location permission &amp; booting...</div>
+  </div>
+
+  <div class="app" id="mainApp">
+    <!-- Top Header -->
+    <header class="card card-vip">
+      <div class="brand-left">
+        <img src="dahy.png" alt="Dashboard Logo" class="brand-logo" onerror="this.style.display='none'" />
+        <div class="title-group">
+          <h1>Project F.L.O.W. <span class="vip-badge">VIP EDITION</span></h1>
+          <p>Multi-Zone Irrigation &amp; Telemetry</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button class="icon-btn" id="sfxBtn" onclick="toggleSfx()">
+          <span id="sfxIconWrap"></span>
+          <span id="sfxLabel">SFX: ON</span>
+        </button>
+        <button class="icon-btn" id="notifBtn" onclick="openPanel('panelAlerts')">
+          <span id="bellIconWrap"></span>
+          <span>Alerts</span>
+          <span class="notif-badge" id="notifCount">0</span>
+        </button>
+        <button class="icon-btn" id="settingsBtn" onclick="openPanel('panelSettings')">
+          <span id="gearIconWrap"></span>
+          <span>Settings</span>
+        </button>
+        <div class="pill">
+          <span class="dot" id="fbDot"></span>
+          <span id="fbText">Connecting...</span>
+        </div>
+        <div class="pill">
+          <span class="dot" id="pumpDot"></span>
+          <span id="pumpText">Pump: OFF</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Location, Weather, FPG, MS, Time & Day/Night Strip -->
+    <section class="card env-strip">
+      <div class="env-left">
+        <span class="env-place" id="locPlaceText">
+          <span id="locIconWrap"></span>
+          <span>Detecting area, state &amp; country...</span>
+        </span>
+        <span class="env-weather" id="localWeatherText">Weather: --</span>
+      </div>
+      <div class="env-right">
+        <span class="diag-tag">FPG: <strong id="fpgVal">WAIT</strong></span>
+        <span class="diag-tag">MS: <strong id="msVal">INIT</strong></span>
+        <span id="localTimeText">--:--:--</span>
+        <span class="phase-badge" id="dayNightBadge">
+          <span id="phaseIconWrap"></span>
+          <span id="phaseLabel">DAY / NIGHT</span>
+        </span>
+      </div>
+    </section>
+
+    <!-- Offline Gate -->
+    <section class="card offline-overlay" id="offlineGate">
+      <div class="offline-top">
+        <div class="offline-icon-box" id="offlineIconWrap"></div>
+        <div>
+          <div class="offline-title" id="offlineTitle">Machine Offline</div>
+          <div class="offline-msg" id="offlineMessage">
+            No internet or live F.L.O.W. signal. Connect F.L.O.W. to Wi-Fi or plug it in to use the dashboard.
+          </div>
+        </div>
+      </div>
+      <div class="offline-actions">
+        <div class="offline-codes" id="offlineMeta">FPG: -- | MS: --</div>
+        <button class="btn-retry" id="retryBtn" onclick="retryMachineLink()">
+          <span id="retryIconWrap"></span>
+          <span id="retryBtnLabel">Retry</span>
+        </button>
+      </div>
+    </section>
+
+    <div id="dashboardBody" class="dashboard-body" style="display:flex;flex-direction:column;gap:16px;">
+      <!-- Mode Selector Tabs -->
+      <section class="modes-grid">
+        <button class="mode-btn active" id="modeBtn0" onclick="selectModePanel(0)">
+          <div class="mode-top"><span>Master</span><span class="mode-pill">MANUAL</span></div>
+          <div class="mode-desc">Manual valve, pump &amp; calendar schedule</div>
+        </button>
+
+        <button class="mode-btn" id="modeBtn1" onclick="selectModePanel(1)">
+          <div class="mode-top"><span>Smart</span><span class="mode-pill">AUTO</span></div>
+          <div class="mode-desc">Lowest zone &lt; 5% waters first to 30%</div>
+        </button>
+
+        <button class="mode-btn" id="modeBtn2" onclick="selectModePanel(2)">
+          <div class="mode-top"><span>Vision</span><span class="mode-pill">LUNA.AI</span></div>
+          <div class="mode-desc">AI checks moisture, weather &amp; 6 PM–6 AM hold</div>
+        </button>
+      </section>
+
+      <!-- SEPARATE PANEL 1: MASTER (MANUAL + CALENDAR SCHEDULE) -->
+      <section class="card card-vip clean-panel open" id="panelMaster">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">Master Control Panel</div>
+            <div class="panel-sub">Manual valve switching, pump relay, and manual-mode watering schedule.</div>
+          </div>
+          <button class="btn-close-panel" onclick="closeAllPanels()">Hide Panel</button>
+        </div>
+
+        <div class="master-top-bar">
+          <span style="font-size:0.82rem;color:var(--muted);">1.5s non-blocking valve settle delay when changing zones.</span>
+          <button class="calendar-btn" onclick="toggleScheduleBox()">
+            <span id="calIconWrap"></span>
+            <span>Schedule Watering</span>
+          </button>
+        </div>
+
+        <button class="pump-btn off" id="pumpBtn" onclick="togglePump()">Turn Pump ON</button>
+
+        <div class="schedule-box" id="scheduleBox">
+          <div class="sched-grid">
+            <div class="sched-field">
+              <label for="schedType">Schedule Mode</label>
+              <select id="schedType" onchange="updateSchedTypeUI()">
+                <option value="alarm">Alarm (Time of Day)</option>
+                <option value="timer">Timer (After Hours)</option>
+              </select>
+            </div>
+            <div class="sched-field" id="alarmField">
+              <label for="schedTime">Alarm Time</label>
+              <input type="time" id="schedTime" value="06:00" />
+            </div>
+            <div class="sched-field" id="timerField" style="display:none;">
+              <label for="schedHours">Water After (Hours)</label>
+              <input type="number" id="schedHours" min="1" max="72" value="1" />
+            </div>
+            <div class="sched-field">
+              <label for="schedThreshold">Stop Moisture Threshold (%)</label>
+              <input type="number" id="schedThreshold" min="20" max="90" value="60" />
+            </div>
+          </div>
+          <div class="sched-foot">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--gold-bright);" id="schedStatusText">Schedule: OFF</span>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-gold" onclick="saveSchedule(true)">Save &amp; Enable</button>
+              <button class="btn-close-panel" onclick="saveSchedule(false)">Turn Off</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SEPARATE PANEL 2: SMART MODE -->
+      <section class="card card-vip clean-panel" id="panelSmart">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">Smart Mode Panel</div>
+            <div class="panel-sub">Automatic lowest-moisture priority queue (&lt; 5% trigger up to &gt;= 30%).</div>
+          </div>
+          <button class="btn-close-panel" onclick="closeAllPanels()">Hide Panel</button>
+        </div>
+
+        <div class="info-3col">
+          <div class="info-box"><div class="info-lbl">PRIORITY ORDER</div><div class="info-val">Lowest Zone &lt; 5% First</div></div>
+          <div class="info-box"><div class="info-lbl">STOP TARGET</div><div class="info-val">Reach &gt;= 30% Moisture</div></div>
+          <div class="info-box"><div class="info-lbl">LIVE STATUS</div><div class="info-val" id="smartAutoStatus">Standby (&lt;5% to 30%)</div></div>
+        </div>
+      </section>
+
+      <!-- SEPARATE PANEL 3: VISION / LUNA.AI MODE -->
+      <section class="card card-vip clean-panel" id="panelVision">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">Vision / Luna.AI Panel</div>
+            <div class="panel-sub">Evaluates moisture, temperature, humidity, light &amp; 6 PM–6 AM night hold.</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-gold" onclick="askLuna()">
+              <span id="scanIconWrap"></span>
+              <span>Run Scan</span>
+            </button>
+            <button class="btn-close-panel" onclick="closeAllPanels()">Hide Panel</button>
+          </div>
+        </div>
+
+        <div class="log-box">
+          <div id="statusLog" style="font-size:0.86rem;">System Ready</div>
+          <div class="log-meta">
+            <span id="activeValveLabel">Valve: Farm A (15°)</span>
+            <span>Night Hold: 6 PM – 6 AM</span>
+            <span id="nextScanLabel">Next Scan: --</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- SEPARATE PANEL 4: ALERTS / NOTIFICATIONS -->
+      <section class="card card-vip clean-panel" id="panelAlerts">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">Notifications Panel</div>
+            <div class="panel-sub">Low/full water alerts, night mode activation, and night watering requests.</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-close-panel" onclick="clearNotifications()">Clear</button>
+            <button class="btn-close-panel" onclick="closeAllPanels()">Close</button>
+          </div>
+        </div>
+        <div class="notif-list" id="notifList"></div>
+      </section>
+
+      <!-- SEPARATE PANEL 5: SETTINGS (DEVICE LOG + DEVICE PERFORMANCE) -->
+      <section class="card card-vip clean-panel" id="panelSettings">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">Settings Panel</div>
+            <div class="panel-sub">Hardware power/buzzer actions and runtime performance graph.</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <div class="subtabs">
+              <button class="subtab active" id="tabLog" onclick="switchSubtab('log')">Device Log</button>
+              <button class="subtab" id="tabPerf" onclick="switchSubtab('perf')">Device Performance</button>
+            </div>
+            <button class="btn-close-panel" onclick="closeAllPanels()">Close</button>
+          </div>
+        </div>
+
+        <div class="subpane active" id="subpaneLog">
+          <div class="info-3col">
+            <button class="btn-secondary" onclick="sendDeviceCmd('restart')">1. Restart Machine</button>
+            <button class="btn-secondary" onclick="sendDeviceCmd('power_off')">2. Power Off F.L.O.W.</button>
+            <button class="btn-secondary" onclick="sendDeviceCmd('buzz')">3. Buzz the Buzzer</button>
+          </div>
+          <p style="font-size:0.76rem;color:var(--muted);margin-top:10px;">
+            Boot / Restart flow: 5s pause after power, then 5s LEDs + buzzer beep before OLED, LCD, and Wi-Fi start.
+          </p>
+        </div>
+
+        <div class="subpane" id="subpanePerf">
+          <div class="perf-grid">
+            <div class="info-box"><div class="info-lbl">PUMP ON COUNT</div><div class="info-val" id="perfPumpCount">0</div></div>
+            <div class="info-box"><div class="info-lbl">ACTIVE DAYS</div><div class="info-val" id="perfDays">1 d</div></div>
+            <div class="info-box"><div class="info-lbl">TOTAL HOURS</div><div class="info-val" id="perfHours">0.0 h</div></div>
+          </div>
+          <div class="bar-chart" id="powerBarChart"></div>
+        </div>
+      </section>
+
+      <!-- 3 Farm Cards with Gauges Beside Each Percentage -->
+      <section class="zones-grid">
+        <div class="card zone-card selected" id="zoneCard0">
+          <div class="zone-top"><span class="zone-title">Farm A</span><span class="zone-tag" id="zoneTag0">15°</span></div>
+          <div class="zone-reading">
+            <span class="zone-val" id="moistVal0">--%</span>
+            <svg class="gauge-svg" viewBox="0 0 70 44">
+              <path class="gauge-track" d="M 8 38 A 27 27 0 0 1 62 38" />
+              <path class="gauge-arc" id="gaugeArc0" d="M 8 38 A 27 27 0 0 1 62 38" />
+            </svg>
+          </div>
+          <div class="bar-bg"><div class="bar-fill" id="moistBar0"></div></div>
+          <button class="btn-secondary" id="zoneBtn0" onclick="selectZone(0)">Select Farm A</button>
+        </div>
+
+        <div class="card zone-card" id="zoneCard1">
+          <div class="zone-top"><span class="zone-title">Farm B</span><span class="zone-tag" id="zoneTag1">90°</span></div>
+          <div class="zone-reading">
+            <span class="zone-val" id="moistVal1">--%</span>
+            <svg class="gauge-svg" viewBox="0 0 70 44">
+              <path class="gauge-track" d="M 8 38 A 27 27 0 0 1 62 38" />
+              <path class="gauge-arc" id="gaugeArc1" d="M 8 38 A 27 27 0 0 1 62 38" />
+            </svg>
+          </div>
+          <div class="bar-bg"><div class="bar-fill" id="moistBar1"></div></div>
+          <button class="btn-secondary" id="zoneBtn1" onclick="selectZone(1)">Select Farm B</button>
+        </div>
+
+        <div class="card zone-card" id="zoneCard2">
+          <div class="zone-top"><span class="zone-title">Farm C</span><span class="zone-tag" id="zoneTag2">165°</span></div>
+          <div class="zone-reading">
+            <span class="zone-val" id="moistVal2">--%</span>
+            <svg class="gauge-svg" viewBox="0 0 70 44">
+              <path class="gauge-track" d="M 8 38 A 27 27 0 0 1 62 38" />
+              <path class="gauge-arc" id="gaugeArc2" d="M 8 38 A 27 27 0 0 1 62 38" />
+            </svg>
+          </div>
+          <div class="bar-bg"><div class="bar-fill" id="moistBar2"></div></div>
+          <button class="btn-secondary" id="zoneBtn2" onclick="selectZone(2)">Select Farm C</button>
+        </div>
+      </section>
+
+      <!-- 4 Sensor Telemetry Tiles -->
+      <section class="metrics-grid">
+        <div class="card"><div class="metric-label">Flow Rate</div><div class="metric-number" id="flowVal">0.0 L/m</div></div>
+        <div class="card"><div class="metric-label">Temperature</div><div class="metric-number" id="tempVal">25.0°C</div></div>
+        <div class="card"><div class="metric-label">Humidity</div><div class="metric-number" id="humVal">50%</div></div>
+        <div class="card"><div class="metric-label">Light Level</div><div class="metric-number" id="lightVal">0%</div></div>
+      </section>
+    </div>
+
+    <footer>
+      Dashboard created by
+      <a href="https://arnavjalwekar4-code.github.io/about-me/" target="_blank" rel="noopener noreferrer" class="creator-link" onclick="playSfx('click')">Arnav Jalwekar</a>
+    </footer>
+  </div>
+
+  <script>
+    const DB_URL = "https://flow-289e5-default-rtdb.firebaseio.com";
+    const DB_SECRET = "CIdFCDSwS46rYT3zIxUHycTmbpN8bD8TGk2aaEdy";
+    const OFFLINE_TIMEOUT_MS = 7000;
+    const GAUGE_LEN = 82;
+
+    const ICONS = {
+      volOn: `<svg class="ico" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>`,
+      volOff: `<svg class="ico" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`,
+      bell: `<svg class="ico" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>`,
+      gear: `<svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`,
+      pin: `<svg class="ico" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>`,
+      sun: `<svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>`,
+      moon: `<svg class="ico" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`,
+      wifiOff: `<svg class="ico ico-lg" viewBox="0 0 24 24"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path><path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>`,
+      retry: `<svg class="ico" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>`,
+      zap: `<svg class="ico" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`,
+      calendar: `<svg class="ico" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>`
+    };
+
+    document.getElementById("sfxIconWrap").innerHTML = ICONS.volOn;
+    document.getElementById("bellIconWrap").innerHTML = ICONS.bell;
+    document.getElementById("gearIconWrap").innerHTML = ICONS.gear;
+    document.getElementById("offlineIconWrap").innerHTML = ICONS.wifiOff;
+    document.getElementById("retryIconWrap").innerHTML = ICONS.retry;
+    document.getElementById("scanIconWrap").innerHTML = ICONS.zap;
+    document.getElementById("calIconWrap").innerHTML = ICONS.calendar;
+
+    let sfxEnabled = true, audioCtx = null, eventSource = null;
+    let state = { mode: 0, zone: 0, manualPump: 0, pumpOn: false, activeZone: 0 };
+    let lastTelemetry = null, lastTelemetrySeenAt = 0, lastUserActionAt = 0;
+    let isMachineOnline = false, networkReachable = navigator.onLine;
+    let notifications = [], lastAlertKey = "";
+
+    const zoneNames = ["Farm A", "Farm B", "Farm C"];
+    const modeNames = ["MASTER", "SMART", "LUNA.AI"];
+    const angles = ["15°", "90°", "165°"];
+    const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const ALL_PANELS = ["panelMaster", "panelSmart", "panelVision", "panelAlerts", "panelSettings"];
+
+    function getAudioCtx() {
+      if (!audioCtx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx) audioCtx = new Ctx();
+      }
+      if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+      return audioCtx;
+    }
+
+    function playTone(freq, duration, type = "sine", delay = 0, gainPeak = 0.05) {
+      if (!sfxEnabled) return;
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+      const t0 = ctx.currentTime + delay;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t0);
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.linearRampToValueAtTime(gainPeak, t0 + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(t0); osc.stop(t0 + duration + 0.02);
+    }
+
+    function playSfx(kind) {
+      if (!sfxEnabled) return;
+      if (kind === "click") playTone(680, 0.07, "sine", 0, 0.045);
+      else if (kind === "mode") { playTone(540, 0.08, "triangle", 0, 0.05); playTone(810, 0.1, "triangle", 0.07, 0.05); }
+      else if (kind === "pumpOn") { playTone(460, 0.09, "sawtooth", 0, 0.035); playTone(690, 0.14, "sawtooth", 0.08, 0.04); }
+      else if (kind === "pumpOff") { playTone(640, 0.09, "sine", 0, 0.045); playTone(420, 0.12, "sine", 0.07, 0.04); }
+      else if (kind === "complete") { playTone(587.33, 0.1, "sine", 0, 0.05); playTone(783.99, 0.12, "sine", 0.09, 0.05); playTone(1046.5, 0.2, "sine", 0.18, 0.055); }
+    }
+
+    function toggleSfx() {
+      sfxEnabled = !sfxEnabled;
+      document.getElementById("sfxIconWrap").innerHTML = sfxEnabled ? ICONS.volOn : ICONS.volOff;
+      document.getElementById("sfxLabel").textContent = sfxEnabled ? "SFX: ON" : "SFX: OFF";
+      if (sfxEnabled) playSfx("click");
+    }
+
+    function openPanel(panelId) {
+      playSfx("click");
+      ALL_PANELS.forEach((id) => {
+        document.getElementById(id).classList.toggle("open", id === panelId);
+      });
+      document.getElementById("notifBtn").classList.toggle("active", panelId === "panelAlerts");
+      document.getElementById("settingsBtn").classList.toggle("active", panelId === "panelSettings");
+    }
+
+    function closeAllPanels() {
+      playSfx("click");
+      ALL_PANELS.forEach((id) => document.getElementById(id).classList.remove("open"));
+      document.getElementById("notifBtn").classList.remove("active");
+      document.getElementById("settingsBtn").classList.remove("active");
+    }
+
+    function selectModePanel(m) {
+      if (!isMachineOnline) return;
+      playSfx("mode");
+      state.mode = m;
+      if (m !== 0) {
+        state.manualPump = 0;
+        document.getElementById("scheduleBox").classList.remove("open");
+      }
+      const targetPanel = m === 0 ? "panelMaster" : (m === 1 ? "panelSmart" : "panelVision");
+      openPanel(targetPanel);
+      render();
+      patchControls({ mode: m, manualPump: state.manualPump });
+    }
+
+    function switchSubtab(tab) {
+      playSfx("click");
+      document.getElementById("tabLog").classList.toggle("active", tab === "log");
+      document.getElementById("tabPerf").classList.toggle("active", tab === "perf");
+      document.getElementById("subpaneLog").classList.toggle("active", tab === "log");
+      document.getElementById("subpanePerf").classList.toggle("active", tab === "perf");
+    }
+
+    function addNotification(text, isNightPrompt = false) {
+      const key = `${text}|${isNightPrompt}`;
+      if (key === lastAlertKey) return;
+      lastAlertKey = key;
+      notifications.unshift({
+        text,
+        isNightPrompt,
+        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      });
+      if (notifications.length > 25) notifications.pop();
+      renderNotifications();
+    }
+
+    function clearNotifications() {
+      playSfx("click");
+      notifications = [];
+      lastAlertKey = "";
+      renderNotifications();
+    }
+
+    function respondNightRequest(accept) {
+      playSfx("click");
+      patchControls({ nightDecision: accept ? "accept" : "decline" });
+      addNotification(accept ? "Accepted night watering request." : "Declined night watering request.", false);
+    }
+
+    function renderNotifications() {
+      document.getElementById("notifCount").textContent = String(notifications.length);
+      const list = document.getElementById("notifList");
+      if (!notifications.length) {
+        list.innerHTML = `<div class="notif-item"><span style="color:var(--muted);font-size:0.82rem;">No alerts yet.</span></div>`;
+        return;
+      }
+      list.innerHTML = notifications.map((n) => `
+        <div class="notif-item">
+          <div>
+            <div style="font-size:0.82rem;">${n.text}</div>
+            <div class="notif-time">${n.time}</div>
+          </div>
+          ${n.isNightPrompt ? `
+            <div style="display:flex;gap:8px;">
+              <button class="btn-gold" onclick="respondNightRequest(true)">Accept Req</button>
+              <button class="btn-close-panel" onclick="respondNightRequest(false)">Decline Req</button>
+            </div>
+          ` : ""}
+        </div>
+      `).join("");
+    }
+    renderNotifications();
+
+    function sendDeviceCmd(cmd) {
+      playSfx("click");
+      patchControls({ deviceCmd: cmd });
+      addNotification(`Sent command: ${cmd.replace("_", " ").toUpperCase()}`);
+    }
+
+    function renderPerformanceChart(tele) {
+      const pCount = tele && tele.pumpOnCount !== undefined ? tele.pumpOnCount : 0;
+      const days = tele && tele.activeDays !== undefined ? tele.activeDays : 1;
+      const hrs = tele && tele.totalHours !== undefined ? Number(tele.totalHours).toFixed(1) : "0.0";
+      const mins = Array.isArray(tele && tele.dailyMins) && tele.dailyMins.length === 7
+        ? tele.dailyMins : [20, 45, 30, 60, 40, 55, 25];
+
+      document.getElementById("perfPumpCount").textContent = String(pCount);
+      document.getElementById("perfDays").textContent = `${days} d`;
+      document.getElementById("perfHours").textContent = `${hrs} h`;
+
+      const maxVal = Math.max(10, ...mins);
+      document.getElementById("powerBarChart").innerHTML = mins.map((m, idx) => {
+        const pct = Math.max(8, Math.round((Number(m || 0) / maxVal) * 100));
+        return `
+          <div class="chart-col" title="${dayLabels[idx]}: ${m || 0} min">
+            <div class="chart-bar-wrap"><div class="chart-bar" style="height:${pct}%;"></div></div>
+            <div class="chart-day">${dayLabels[idx]}</div>
+          </div>
+        `;
+      }).join("");
+    }
+    renderPerformanceChart(null);
+
+    function toggleScheduleBox() {
+      if (!isMachineOnline || state.mode !== 0) return;
+      playSfx("click");
+      updateSchedTypeUI();
+      document.getElementById("scheduleBox").classList.toggle("open");
+    }
+
+    function updateSchedTypeUI() {
+      const t = document.getElementById("schedType").value;
+      document.getElementById("alarmField").style.display = t === "alarm" ? "flex" : "none";
+      document.getElementById("timerField").style.display = t === "timer" ? "flex" : "none";
+    }
+
+    function saveSchedule(enable) {
+      if (!isMachineOnline || state.mode !== 0) return;
+      playSfx("click");
+      const type = document.getElementById("schedType").value;
+      const [hh, mm] = (document.getElementById("schedTime").value || "06:00").split(":").map((n) => parseInt(n, 10) || 0);
+      const hours = Math.max(1, Math.min(72, parseInt(document.getElementById("schedHours").value, 10) || 1));
+      const threshold = Math.max(20, Math.min(90, parseInt(document.getElementById("schedThreshold").value, 10) || 60));
+      const st = document.getElementById("schedStatusText");
+
+      if (!enable) {
+        st.textContent = "Schedule: OFF";
+        patchControls({ schedEnabled: false });
+        return;
+      }
+      st.textContent = type === "alarm"
+        ? `Schedule: ALARM ${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")} -> ${threshold}%`
+        : `Schedule: TIMER +${hours}h -> ${threshold}%`;
+
+      patchControls({
+        schedEnabled: true,
+        schedType: type,
+        schedHour: hh,
+        schedMinute: mm,
+        schedHours: hours,
+        schedThreshold: threshold
+      });
+    }
+
+    function setPlaceText(text) {
+      document.getElementById("locPlaceText").innerHTML = `${ICONS.pin}<span>${text}</span>`;
+    }
+
+    function updateLocalClockAndDayNight() {
+      const now = new Date();
+      document.getElementById("localTimeText").textContent = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      const hr = now.getHours();
+      const isNight = hr >= 18 || hr < 6;
+      const badge = document.getElementById("dayNightBadge");
+      badge.className = "phase-badge " + (isNight ? "night" : "day");
+      document.getElementById("phaseIconWrap").innerHTML = isNight ? ICONS.moon : ICONS.sun;
+      document.getElementById("phaseLabel").textContent = isNight ? "NIGHTTIME" : "DAYTIME";
+    }
+    setInterval(updateLocalClockAndDayNight, 1000);
+    updateLocalClockAndDayNight();
+
+    function weatherCodeToText(code) {
+      if (code === 0) return "Clear Sky";
+      if (code <= 3) return "Partly Cloudy";
+      if (code <= 48) return "Foggy";
+      if (code <= 57) return "Drizzle";
+      if (code <= 67) return "Rain";
+      if (code <= 77) return "Snow";
+      if (code <= 82) return "Rain Showers";
+      if (code >= 95) return "Thunderstorm";
+      return "Mild";
+    }
+
+    function fetchLocationAndWeather() {
+      const weatherEl = document.getElementById("localWeatherText");
+      setPlaceText("Detecting area, state & country...");
+      if (!("geolocation" in navigator)) {
+        setPlaceText("Location unavailable");
+        weatherEl.textContent = "Weather: N/A";
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        try {
+          const [geoRes, wxRes] = await Promise.all([
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`, { headers: { "Accept": "application/json" } }),
+            fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code`)
+          ]);
+          if (geoRes.ok) {
+            const addr = (await geoRes.json()).address || {};
+            const area = addr.suburb || addr.neighbourhood || addr.city_district || addr.village || addr.town || addr.city || "";
+            const stateName = addr.state || addr.region || "";
+            const country = addr.country || "";
+            const parts = [area, stateName, country].filter(Boolean);
+            setPlaceText(parts.length ? parts.join(", ") : `${latitude.toFixed(2)}°, ${longitude.toFixed(2)}°`);
+          }
+          if (wxRes.ok) {
+            const cur = (await wxRes.json()).current || {};
+            const desc = weatherCodeToText(cur.weather_code ?? 0);
+            const temp = cur.temperature_2m !== undefined ? `${Math.round(cur.temperature_2m)}°C` : "--";
+            const hum = cur.relative_humidity_2m !== undefined ? ` · ${Math.round(cur.relative_humidity_2m)}% RH` : "";
+            weatherEl.textContent = `${desc} · ${temp}${hum}`;
+          }
+        } catch (e) {
+          setPlaceText(`${latitude.toFixed(2)}°, ${longitude.toFixed(2)}°`);
+          weatherEl.textContent = "Weather: Unavailable";
+        }
+      }, () => {
+        setPlaceText("Location permission skipped / blocked");
+        weatherEl.textContent = "Weather: Enable location";
+      }, { enableHighAccuracy: false, timeout: 5200, maximumAge: 60000 });
+    }
+
+    (function initCursor() {
+      const dot = document.getElementById("cursorDot"), ring = document.getElementById("cursorRing");
+      if (!dot || !ring) return;
+      let mx = window.innerWidth / 2, my = window.innerHeight / 2, rx = mx, ry = my;
+      window.addEventListener("mousemove", (e) => { mx = e.clientX; my = e.clientY; dot.style.left = `${mx}px`; dot.style.top = `${my}px`; });
+      window.addEventListener("mousedown", () => document.body.classList.add("cursor-down"));
+      window.addEventListener("mouseup", () => document.body.classList.remove("cursor-down"));
+      document.querySelectorAll("a, button, .card, input, select").forEach((el) => {
+        el.addEventListener("mouseenter", () => document.body.classList.add("cursor-hover"));
+        el.addEventListener("mouseleave", () => document.body.classList.remove("cursor-hover"));
+      });
+      (function loop() { rx += (mx - rx) * 0.16; ry += (my - ry) * 0.16; ring.style.left = `${rx}px`; ring.style.top = `${ry}px`; requestAnimationFrame(loop); })();
+    })();
+
+    (function runSixSecondLoader() {
+      const durationMs = 6000, start = performance.now();
+      const pctEl = document.getElementById("loaderPercent"), barEl = document.getElementById("loaderBar"), stepEl = document.getElementById("loaderStep");
+      const preloader = document.getElementById("preloader"), mainApp = document.getElementById("mainApp");
+      fetchLocationAndWeather();
+      const milestones = [
+        [0, "Requesting location permission & booting..."],
+        [25, "Loading dahy.png brand assets..."],
+        [50, "Fetching local area, state & weather..."],
+        [75, "Checking F.L.O.W. telemetry link..."],
+        [100, "Dashboard ready"]
+      ];
+      function tick(now) {
+        const p = Math.min(100, Math.round(((now - start) / durationMs) * 100));
+        pctEl.textContent = `${p}%`; barEl.style.width = `${p}%`;
+        for (const [at, txt] of milestones) if (p >= at) stepEl.textContent = txt;
+        if (now - start < durationMs) requestAnimationFrame(tick);
+        else {
+          playSfx("complete");
+          setTimeout(() => { preloader.classList.add("done"); mainApp.classList.add("revealed"); }, 220);
+        }
+      }
+      requestAnimationFrame(tick);
+    })();
+
+    (function initBackground() {
+      const canvas = document.getElementById("bgCanvas"), ctx = canvas.getContext("2d");
+      let w, h, t = 0;
+      const resize = () => { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; };
+      window.addEventListener("resize", resize); resize();
+      const waves = [
+        { amp: 24, freq: 0.004, speed: 0.012, yBase: 0.72, color: "rgba(229, 184, 105, 0.055)" },
+        { amp: 32, freq: 0.003, speed: -0.009, yBase: 0.80, color: "rgba(56, 189, 248, 0.04)" },
+        { amp: 20, freq: 0.005, speed: 0.015, yBase: 0.88, color: "rgba(229, 184, 105, 0.04)" }
+      ];
+      (function draw() {
+        ctx.clearRect(0, 0, w, h);
+        waves.forEach((wv) => {
+          ctx.beginPath(); ctx.moveTo(0, h);
+          for (let x = 0; x <= w; x += 12) ctx.lineTo(x, h * wv.yBase + Math.sin(x * wv.freq + t * wv.speed * 60) * wv.amp);
+          ctx.lineTo(w, h); ctx.closePath(); ctx.fillStyle = wv.color; ctx.fill();
+        });
+        t += 0.016; requestAnimationFrame(draw);
+      })();
+    })();
+
+    function evaluateMachineHealth() {
+      const ageMs = lastTelemetrySeenAt > 0 ? (Date.now() - lastTelemetrySeenAt) : Infinity;
+      const ageSec = Number.isFinite(ageMs) ? (ageMs / 1000).toFixed(1) : "--";
+      const fresh = networkReachable && lastTelemetry !== null && ageMs <= OFFLINE_TIMEOUT_MS;
+      isMachineOnline = fresh;
+
+      const fpgEl = document.getElementById("fpgVal"), msEl = document.getElementById("msVal");
+      const fbDot = document.getElementById("fbDot"), fbText = document.getElementById("fbText");
+      const gate = document.getElementById("offlineGate"), body = document.getElementById("dashboardBody");
+
+      if (fresh) {
+        fpgEl.textContent = `LIVE (${ageSec}s)`;
+        msEl.textContent = `${modeNames[state.mode]}/SYNC`;
+        fbDot.className = "dot ok"; fbText.textContent = "Online";
+        gate.classList.remove("active"); body.classList.remove("locked");
+      } else {
+        fpgEl.textContent = !networkReachable ? "NO-NET" : `GAP (${ageSec}s)`;
+        msEl.textContent = `${modeNames[state.mode]}/OFF`;
+        fbDot.className = "dot"; fbText.textContent = "Offline";
+        gate.classList.add("active"); body.classList.add("locked");
+        document.getElementById("offlineTitle").textContent = !networkReachable ? "No Internet Connection" : "F.L.O.W. Machine Offline";
+        document.getElementById("offlineMessage").textContent = "No internet or live F.L.O.W. signal. Connect F.L.O.W. to Wi-Fi or plug it in to use the dashboard.";
+        document.getElementById("offlineMeta").textContent = `FPG: ${fpgEl.textContent} | MS: ${msEl.textContent}`;
+      }
+    }
+
+    async function retryMachineLink() {
+      playSfx("click");
+      const btn = document.getElementById("retryBtn"), lbl = document.getElementById("retryBtnLabel");
+      btn.disabled = true; lbl.textContent = "Checking...";
+      networkReachable = navigator.onLine;
+      if (eventSource) { try { eventSource.close(); } catch (e) {} eventSource = null; }
+      connectStream();
+      await pollFlow();
+      btn.disabled = false; lbl.textContent = "Retry";
+    }
+
+    async function patchControls(data) {
+      if (!isMachineOnline) return;
+      lastUserActionAt = Date.now();
+      try {
+        await fetch(`${DB_URL}/FLOW/controls.json?auth=${DB_SECRET}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data)
+        });
+      } catch (e) {}
+    }
+
+    function selectZone(z) {
+      if (!isMachineOnline || state.mode !== 0) return;
+      playSfx("click");
+      state.zone = z; state.activeZone = z;
+      render();
+      patchControls({ zone: z });
+    }
+
+    function togglePump() {
+      if (!isMachineOnline || state.mode !== 0) return;
+      const turningOn = state.manualPump === 0;
+      playSfx(turningOn ? "pumpOn" : "pumpOff");
+      state.manualPump = turningOn ? 1 : 0;
+      render();
+      patchControls({ manualPump: state.manualPump });
+    }
+
+    function askLuna() {
+      if (!isMachineOnline || state.mode !== 2) return;
+      playSfx("click");
+      document.getElementById("statusLog").textContent = "Asking Vision / Luna.AI...";
+      patchControls({ askLunaNow: true });
+    }
+
+    function render(tele = lastTelemetry) {
+      if (tele) { lastTelemetry = tele; lastTelemetrySeenAt = Date.now(); }
+
+      [0, 1, 2].forEach((i) => {
+        document.getElementById(`modeBtn${i}`).className = "mode-btn" + (state.mode === i ? " active" : "");
+      });
+
+      const activeZ = tele && tele.activeZone !== undefined ? tele.activeZone : state.activeZone;
+      state.activeZone = activeZ;
+
+      [0, 1, 2].forEach((z) => {
+        const card = document.getElementById(`zoneCard${z}`), tag = document.getElementById(`zoneTag${z}`), btn = document.getElementById(`zoneBtn${z}`);
+        const isSel = activeZ === z;
+        card.classList.toggle("selected", isSel);
+        tag.textContent = isSel ? `ACTIVE · ${angles[z]}` : angles[z];
+        btn.disabled = state.mode !== 0;
+        btn.textContent = state.mode === 0 ? (isSel ? `Active: ${zoneNames[z]}` : `Select ${zoneNames[z]}`) : `${modeNames[state.mode]} Mode`;
+      });
+
+      const pumpBtn = document.getElementById("pumpBtn");
+      const pumpActive = tele && tele.pumpOn !== undefined ? tele.pumpOn : state.pumpOn;
+      state.pumpOn = pumpActive;
+      pumpBtn.className = "pump-btn " + (state.manualPump === 1 ? "on" : "off");
+      pumpBtn.textContent = state.manualPump === 1 ? "Turn Pump OFF" : "Turn Pump ON";
+
+      document.getElementById("pumpDot").className = "dot" + (pumpActive ? " pump" : "");
+      document.getElementById("pumpText").textContent = pumpActive ? `Pump: ON (${zoneNames[activeZ]})` : "Pump: OFF";
+      document.getElementById("activeValveLabel").textContent = `Valve: ${zoneNames[activeZ]} (${angles[activeZ]})`;
+
+      evaluateMachineHealth();
+      if (!tele) return;
+
+      const moist = [tele.moistureA ?? 0, tele.moistureB ?? 0, tele.moistureC ?? 0];
+      moist.forEach((v, idx) => {
+        const c = Math.max(0, Math.min(100, Number(v) || 0));
+        document.getElementById(`moistVal${idx}`).textContent = `${c}%`;
+        document.getElementById(`moistBar${idx}`).style.width = `${c}%`;
+        const arc = document.getElementById(`gaugeArc${idx}`);
+        if (arc) arc.style.strokeDashoffset = String(GAUGE_LEN - (GAUGE_LEN * (c / 100)));
+      });
+
+      document.getElementById("smartAutoStatus").textContent = pumpActive
+        ? `Watering ${zoneNames[activeZ]} (${moist[activeZ]}% -> 30%)`
+        : "Standby (<5% to 30%)";
+
+      if (tele.flowRate !== undefined) document.getElementById("flowVal").textContent = `${Number(tele.flowRate).toFixed(1)} L/m`;
+      if (tele.temp !== undefined) document.getElementById("tempVal").textContent = `${Number(tele.temp).toFixed(1)}°C`;
+      if (tele.humidity !== undefined) document.getElementById("humVal").textContent = `${Math.round(tele.humidity)}%`;
+      if (tele.light !== undefined) document.getElementById("lightVal").textContent = `${tele.light}%`;
+      if (tele.statusLog) document.getElementById("statusLog").textContent = tele.statusLog;
+      if (tele.nextLunaSec !== undefined) {
+        document.getElementById("nextScanLabel").textContent = state.mode === 2 && tele.nextLunaSec > 0 ? `Next Scan: ${tele.nextLunaSec}s` : "Next Scan: Standby";
+      }
+
+      if (tele.alertMsg) addNotification(tele.alertMsg, Boolean(tele.nightPromptActive));
+      renderPerformanceChart(tele);
+    }
+
+    function applySnapshot(data) {
+      networkReachable = navigator.onLine;
+      if (!data || data === "null") { evaluateMachineHealth(); return; }
+      if ((Date.now() - lastUserActionAt) >= 1500 && data.controls) {
+        if (data.controls.mode !== undefined) state.mode = data.controls.mode;
+        if (data.controls.zone !== undefined) state.zone = data.controls.zone;
+        if (data.controls.manualPump !== undefined) state.manualPump = data.controls.manualPump;
+      }
+      render(data.telemetry || null);
+    }
+
+    async function pollFlow() {
+      networkReachable = navigator.onLine;
+      if (!networkReachable) { evaluateMachineHealth(); return; }
+      try {
+        const res = await fetch(`${DB_URL}/FLOW.json?auth=${DB_SECRET}`, { cache: "no-store" });
+        if (res.ok) applySnapshot(await res.json());
+        else evaluateMachineHealth();
+      } catch (e) {
+        networkReachable = false;
+        evaluateMachineHealth();
+      }
+    }
+
+    function connectStream() {
+      if (!navigator.onLine) { networkReachable = false; evaluateMachineHealth(); return; }
+      eventSource = new EventSource(`${DB_URL}/FLOW.json?auth=${DB_SECRET}`);
+      eventSource.onopen = () => { networkReachable = true; evaluateMachineHealth(); };
+      eventSource.onerror = () => evaluateMachineHealth();
+      eventSource.addEventListener("put", (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.path === "/") applySnapshot(msg.data);
+        else if (msg.path === "/telemetry" && msg.data) render(msg.data);
+      });
+      eventSource.addEventListener("patch", (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.path === "/telemetry" && msg.data) render({ ...(lastTelemetry || {}), ...msg.data });
+      });
+    }
+
+    window.addEventListener("online", () => { networkReachable = true; retryMachineLink(); });
+    window.addEventListener("offline", () => { networkReachable = false; evaluateMachineHealth(); });
+
+    render(); pollFlow(); connectStream();
+    setInterval(pollFlow, 1500);
+    setInterval(evaluateMachineHealth, 500);
+  </script>
+</body>
+</html>
